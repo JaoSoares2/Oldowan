@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>MIPS Mini</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>MIPS Mini</h1>
+        <p>Digite um programa MIPS (mini ISA) e use os botões para inicializar, carregar, executar passo a passo ou rodar alguns passos.</p>
+    </header>
+
+    <section class="controls">
+        <button id="btnInit">Init CPU</button>
+        <button id="btnLoad">Carregar programa</button>
+        <button id="btnStep">Step</button>
+        <button id="btnRun">Run (100 passos)</button>
+        <button id="btnAuto">Auto-run</button>
+        <button id="btnStepPipe">Step pipeline</button>
+        <button id="btnAutoPipe">Auto pipeline</button>
+        <button id="btnClearLog">Limpar log</button>
+    </section>
+
+    <section class="main-grid">
+        <div class="panel">
+            <h2>Editor</h2>
+            <textarea id="source" spellcheck="false"></textarea>
+            <div id="pcLine" class="pc-line"></div>
+            <pre id="log"></pre>
+        </div>
+        <div class="panel">
+            <h2>Registradores</h2>
+            <pre id="regs"></pre>
+            <div class="pc-hi-lo">
+                <div>PC: <span id="pc"></span></div>
+                <div>HI: <span id="hi"></span></div>
+                <div>LO: <span id="lo"></span></div>
+            </div>
+        </div>
+        <div class="panel">
+            <h2>Memória (primeiros 64 bytes)</h2>
+            <pre id="mem"></pre>
+        </div>
+        <div class="panel">
+            <h2>Cache</h2>
+            <div class="cache-row">I-cache: hits <span id="icHits"></span> • misses <span id="icMisses"></span></div>
+            <div class="cache-row">D-cache: hits <span id="dcHits"></span> • misses <span id="dcMisses"></span></div>
+            <div class="cache-conf" id="icConf"></div>
+            <div class="cache-conf" id="dcConf"></div>
+            <div class="cache-row" id="icLast"></div>
+            <h3>Matriz I-cache</h3>
+            <pre id="icMatrix"></pre>
+        </div>
+
+        <div class="panel">
+            <h2>Pipeline (por ciclo)</h2>
+            <pre id="pipeline"></pre>
+        </div>
+
+    </section>
+
+    <script type="module">
+        import { initCpu, loadProgramFromSource, step, run, stepPipeline } from './js/execution.js';
+        import { state } from './js/state.js';
+        import { CONSTANTS } from './js/constants.js';
+
+        const sourceEl = document.getElementById('source');
+        const regsEl = document.getElementById('regs');
+        const memEl = document.getElementById('mem');
+        const pcEl = document.getElementById('pc');
+        const hiEl = document.getElementById('hi');
+        const loEl = document.getElementById('lo');
+        const logEl = document.getElementById('log');
+        const pcLineEl = document.getElementById('pcLine');
+        const icHitsEl = document.getElementById('icHits');
+        const icMissesEl = document.getElementById('icMisses');
+        const dcHitsEl = document.getElementById('dcHits');
+        const dcMissesEl = document.getElementById('dcMisses');
+        const icConfEl = document.getElementById('icConf');
+        const dcConfEl = document.getElementById('dcConf');
+        const icLastEl = document.getElementById('icLast');
+        const icMatrixEl = document.getElementById('icMatrix');
+        const pipelineEl = document.getElementById('pipeline');
+        let programDirty = true;
+
+        // Programa de exemplo: soma dois números e entra em loop
+        const defaultProgram = `
+        ADDI $t0, $zero, 5
+        ADDI $t1, $zero, 7
+        ADD  $t2, $t0, $t1
+    loop:
+        J loop
+        `;
+
+        function formatHex(value, width = 8) {
+            return '0x' + (value >>> 0).toString(16).toUpperCase().padStart(width, '0');
+        }
+
+        function renderRegs() {
+            const lines = state.regs.map((v, i) => {
+                const name = (CONSTANTS.REGISTER_NAMES[i] || `$${i}`).padEnd(5);
+                const isUndef = (v === null || v === undefined);
+                const hex = isUndef ? 'UNDEF' : formatHex(v);
+                const dec = isUndef ? 'UNDEF' : (v | 0).toString(10);
+                return `${name} ${hex} (${dec})`;
+            });
+            regsEl.textContent = lines.join('\n');
+            pcEl.textContent = formatHex(state.pc);
+            hiEl.textContent = formatHex(state.hi);
+            loEl.textContent = formatHex(state.lo);
+        }
+
+        function renderMem() {
+            const bytesToShow = Math.min(64, state.memory.length);
+            const rows = [];
+            for (let i = 0; i < bytesToShow; i += 16) {
+                const sliceArr = Array.from(state.memory.slice(i, i + 16))
+                    .map((b, idx) => {
+                        const addr = i + idx;
+                        // destaca os 4 bytes da instrução apontada pelo PC
+                        const inPcRange = addr >= state.pc && addr < state.pc + 4;
+                        const hex = b.toString(16).toUpperCase().padStart(2, '0');
+                        return inPcRange ? `[${hex}]` : ` ${hex} `;
+                    });
+                const prefix = (state.pc >= i && state.pc < i + 16) ? '→ ' : '  ';
+                rows.push(`${prefix}${formatHex(i, 4)}: ${sliceArr.join(' ')}`);
+            }
+            memEl.textContent = rows.join('\n');
+        }
+        
+        function renderCache() {
+            icHitsEl.textContent = state.iCache.hits;
+            icMissesEl.textContent = state.iCache.misses;
+            dcHitsEl.textContent = state.dCache.hits;
+            dcMissesEl.textContent = state.dCache.misses;
+            icConfEl.textContent = `I: ${CONSTANTS.I_CACHE_SIZE_BYTES}B, bloco ${CONSTANTS.I_CACHE_BLOCK_SIZE}B, ${CONSTANTS.I_CACHE_ASSOCIATIVITY}-way`;
+            dcConfEl.textContent = `D: ${CONSTANTS.D_CACHE_SIZE_BYTES}B, bloco ${CONSTANTS.D_CACHE_BLOCK_SIZE}B, ${CONSTANTS.D_CACHE_ASSOCIATIVITY}-way`;
+
+            const last = state.iCache.lastAccess;
+            if (last) {
+                icLastEl.textContent = `Último I$: ${last.hit ? 'HIT' : 'MISS'} addr=${formatHex(last.address)} set=${last.index} way=${last.way} tag=${last.tag}`;
+            } else {
+                icLastEl.textContent = 'Último I$: (sem acesso ainda)';
+            }
+
+            const rows = [];
+            const cache = state.iCache;
+            for (let s = 0; s < cache.sets; s++) {
+                const ways = cache.data[s];
+                const wayText = ways.map((w, idx) => {
+                    const tagTxt = w.valid ? formatHex(w.tag, 4) : '--';
+                    const dataTxt = w.valid ? Array.from(w.data).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') : '';
+                    return `W${idx}[V=${w.valid ? 1 : 0} Tag=${tagTxt} LRU=${w.lru}] ${dataTxt}`;
+                }).join(' | ');
+                rows.push(`Set ${s}: ${wayText}`);
+            }
+            icMatrixEl.textContent = rows.join('\n');
+        }
+
+        function rerender() {
+            renderRegs();
+            renderMem();
+            renderCache();
+            renderPcLine();
+            renderPipeline();
+        }
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.textContent += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            logEl.textContent = '';
+        }
+
+        function buildPcMap() {
+            const lines = sourceEl.value.split('\n');
+            const mapping = new Map(); // pc -> line index
+            let pcCursor = 0;
+
+            for (let idx = 0; idx < lines.length; idx++) {
+                const raw = lines[idx];
+                const stripped = raw.split(';')[0].split('#')[0].split('//')[0].trim();
+                if (!stripped) continue;
+
+                const parts = stripped.split(':');
+                let instrPart = parts.length > 1 ? parts.slice(1).join(':').trim() : stripped;
+                if (!instrPart) continue; // linha só com label
+
+                mapping.set(pcCursor, idx);
+                pcCursor += 4;
+            }
+            return { mapping, lines };
+        }
+
+        function renderPcLine() {
+            const { mapping, lines } = buildPcMap();
+            const lineIdx = mapping.get(state.pc);
+            if (lineIdx !== undefined) {
+                pcLineEl.textContent = `Linha atual (PC=${formatHex(state.pc)}): ${lineIdx + 1} → ${lines[lineIdx]}`;
+            } else {
+                pcLineEl.textContent = `PC fora do programa (PC=${formatHex(state.pc)})`;
+            }
+        }
+
+        function summarizeCtrl(ctrl = {}) {
+            const flags = [];
+            if (ctrl.regWrite) flags.push('RegW');
+            if (ctrl.memRead) flags.push('MemR');
+            if (ctrl.memWrite) flags.push('MemW');
+            if (ctrl.memToReg) flags.push('Mem→Reg');
+            if (ctrl.aluSrcImm) flags.push('ALUimm');
+            if (ctrl.branch) flags.push(ctrl.branchNe ? 'BNE' : 'BEQ');
+            if (ctrl.jump) flags.push('J');
+            if (ctrl.jumpReg) flags.push('JR');
+            if (ctrl.link) flags.push('Link');
+            return flags.length ? flags.join(', ') : '-';
+        }
+
+        function renderPipeline() {
+            const p = state.pipeline;
+            if (!p) return;
+
+            const fmtPC = v => v == null ? '—' : formatHex(v);
+            const fmtVal = v => v == null ? '—' : `${v | 0}`;
+            const fmtHex = v => v == null ? '—' : formatHex(v);
+            const fmtInstr = stg => {
+                if (!stg) return '—';
+                if (stg.decoded?.name) return stg.decoded.name;
+                if (stg.instr === CONSTANTS.NOP) return 'NOP';
+                if (typeof stg.instr === 'number') return '0x' + (stg.instr >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                return '—';
+            };
+
+            const lines = [];
+            lines.push(`Cycle: ${p.cycle}`);
+            lines.push(`IF/ID : PC=${fmtPC(p.IF_ID?.pc)} instr=${fmtInstr(p.IF_ID)}`);
+            lines.push(`ID/EX : PC=${fmtPC(p.ID_EX?.pc)} op=${fmtInstr(p.ID_EX)} rsVal=${fmtVal(p.ID_EX?.rsVal)} rtVal=${fmtVal(p.ID_EX?.rtVal)} imm=${fmtVal(p.ID_EX?.imm)} dst=${p.ID_EX?.writeReg ?? '—'} ctrl=${summarizeCtrl(p.ID_EX?.ctrl)}`);
+            lines.push(`EX/MEM: PC=${fmtPC(p.EX_MEM?.pc)} op=${fmtInstr(p.EX_MEM)} ALU=${fmtHex(p.EX_MEM?.aluRes)} rtVal=${fmtVal(p.EX_MEM?.rtVal)} dst=${p.EX_MEM?.writeReg ?? '—'} ctrl=${summarizeCtrl(p.EX_MEM?.ctrl)}`);
+            lines.push(`MEM/WB: PC=${fmtPC(p.MEM_WB?.pc)} op=${fmtInstr(p.MEM_WB)} ALU=${fmtHex(p.MEM_WB?.aluRes)} MEM=${fmtVal(p.MEM_WB?.memData)} dst=${p.MEM_WB?.writeReg ?? '—'} ctrl=${summarizeCtrl(p.MEM_WB?.ctrl)}`);
+
+            pipelineEl.textContent = lines.join('\n');
+        }
+
+        let autoTimer = null;
+        let autoPipeTimer = null;
+
+        function attachActions() {
+            sourceEl.addEventListener('input', () => { programDirty = true; });
+
+            function assembleIfDirty() {
+                if (!programDirty) return true;
+                try {
+                    loadProgramFromSource(sourceEl.value);
+                    programDirty = false;
+                    log('Programa carregado e montado');
+                    return true;
+                } catch (e) {
+                    log('Erro ao montar: ' + e.message);
+                    return false;
+                }
+            }
+
+            document.getElementById('btnInit').onclick = () => {
+                initCpu();
+                rerender();
+                log('CPU inicializada');
+            };
+
+            document.getElementById('btnLoad').onclick = () => {
+                if (assembleIfDirty()) {
+                    rerender();
+                }
+            };
+
+            document.getElementById('btnStep').onclick = () => {
+                if (!assembleIfDirty()) return;
+                try {
+                    step();
+                    rerender();
+                    log(state.lastTrace || 'Step executado');
+                } catch (e) {
+                    log('Erro no step: ' + e.message);
+                }
+            };
+
+            document.getElementById('btnRun').onclick = () => {
+                if (!assembleIfDirty()) return;
+                try {
+                    run(100);
+                    rerender();
+                    log(`Executados 100 passos. Último: ${state.lastTrace || 'n/a'}`);
+                } catch (e) {
+                    log('Erro no run: ' + e.message);
+                }
+            };
+
+            document.getElementById('btnAuto').onclick = () => {
+                if (autoTimer) { 
+                    clearInterval(autoTimer); 
+                    autoTimer = null; 
+                    log('Auto-run parado'); 
+                    return; 
+                }
+                if (!assembleIfDirty()) return;
+                autoTimer = setInterval(() => {
+                    try { 
+                        step();
+                        rerender(); 
+                        log(state.lastTrace || 'Step executado');
+                    } catch (e) { 
+                        clearInterval(autoTimer); 
+                        autoTimer = null;
+                        log('Execução parada: ' + e.message);
+                    }
+                }, 200); // ms per step
+                log('Auto-run iniciado');
+            };
+
+            document.getElementById('btnClearLog').onclick = () => {
+                clearLog();
+            };
+
+            document.getElementById('btnStepPipe').onclick = () => {
+                if (!assembleIfDirty()) return;
+                try {
+                    stepPipeline();
+                    rerender();
+                    log(`Pipeline ciclo ${state.pipeline.cycle}`);
+                } catch (e) {
+                    log('Erro no step pipeline: ' + e.message);
+                }
+            };
+
+            document.getElementById('btnAutoPipe').onclick = () => {
+                if (autoPipeTimer) {
+                    clearInterval(autoPipeTimer);
+                    autoPipeTimer = null;
+                    log('Auto pipeline parado');
+                    return;
+                }
+                if (!assembleIfDirty()) return;
+                autoPipeTimer = setInterval(() => {
+                    try {
+                        stepPipeline();
+                        rerender();
+                    } catch (e) {
+                        clearInterval(autoPipeTimer);
+                        autoPipeTimer = null;
+                        log('Execução pipeline parada: ' + e.message);
+                    }
+                }, 200);
+                log('Auto pipeline iniciado');
+            };
+        }
+
+        // Init
+        sourceEl.value = defaultProgram.trim().split('\n').map(l => l.trim()).join('\n');
+        initCpu();
+        attachActions();
+        rerender();
+        log('Pronto. Carregue um programa e execute.');
+    </script>
+</body>
+</html>
