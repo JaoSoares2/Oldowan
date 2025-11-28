@@ -1,5 +1,22 @@
 import { CONSTANTS } from './constants.js';
 import { createCache } from './cache.js';
+import { VECTOR_CONSTANTS } from './constantsMSAExtension.js';
+
+export const extensionFlags = {
+    msaEnabled: false,
+    mulDivEnabled: false,
+    fpuEnabled: false,
+    branchPredictionEnabled: false,
+    cacheEnabled: false,
+    pipelineEnabled: false,
+    mips64Enabled: false
+};
+
+export const msaState = { 
+    // Vector registers
+    vregs: Array(32).fill(int32Array(4)),
+    vl: 4 //vector length 
+};
 
 export const state = {
     // Memória
@@ -28,10 +45,9 @@ export const state = {
     // Contadores de estatísticas
     lastTrace: '',
     
-    
-    
 
     // Caches (set-associative)
     iCache: createCache(CONSTANTS.I_CACHE_SIZE_BYTES, CONSTANTS.I_CACHE_BLOCK_SIZE, CONSTANTS.I_CACHE_ASSOCIATIVITY),
     dCache: createCache(CONSTANTS.D_CACHE_SIZE_BYTES, CONSTANTS.D_CACHE_BLOCK_SIZE, CONSTANTS.D_CACHE_ASSOCIATIVITY)
+
 };
