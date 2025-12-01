@@ -62,60 +62,6 @@ function formatHex(v) {
     return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
 }
 
-// Decodificação de instruções
-function decodeRawFields(instr) {
-    const opcode = (instr >>> 26) & 0x3F; // 6 bits
-
-    if (opcode === 0) {
-        // R-type
-        const rs    = (instr >>> 21) & 0x1F;
-        const rt    = (instr >>> 16) & 0x1F;
-        const rd    = (instr >>> 11) & 0x1F;
-        const shamt = (instr >>>  6) & 0x1F;
-        const funct = (instr       ) & 0x3F;
-
-        return { format: "R", opcode, rs, rt, rd, shamt, funct };
-    } else if (opcode === 2 || opcode === 3) {
-        // J-type
-        const target = instr & 0x03FFFFFF;
-        return { format: "J", opcode, target };
-    } else {
-        // I-type
-        const rs   = (instr >>> 21) & 0x1F;
-        const rt   = (instr >>> 16) & 0x1F;
-        let imm16  = instr & 0xFFFF;
-        // sign-extend
-        if (imm16 & 0x8000) imm16 |= 0xFFFF0000;
-        return { format: "I", opcode, rs, rt, imm16 };
-    }
-}
-
-// Decodificação completa da instrução
-function decodeInstruction(instr) {
-    const raw = decodeRawFields(instr);
-
-    if (raw.format === "R") {
-        const entry = R_TABLE[raw.opcode]?.[raw.funct];
-        if (!entry) throw new Error(`R-type desconhecida: opcode=${raw.opcode}, funct=${raw.funct}`);
-
-        return {
-            ...raw,
-            name: entry.name,
-            type: entry.type  // "R"
-        };
-    } else {
-        const entry = OPCODE_TABLE[raw.opcode];
-        if (!entry) throw new Error(`Instr desconhecida: opcode=${raw.opcode}`);
-
-        return {
-            ...raw,
-            name: entry.name,
-            type: entry.type  // "I" ou "J"
-        };
-    }
-}
-
-
 // Carrega um programa na memória a partir de um array de palavras (32 bits)
 export function loadProgram(words) { // words = array de instruções de 32 bits
     let addr = 0;
@@ -144,69 +90,6 @@ function fetchInstruction() {
     console.log('FETCH PC', pc, 'instr', instr.toString(16), 'I$', state.iCache.lastAccess);
     state.pc = (pc + 4) | 0;
     return instr;
-}
-
-function loadByte(addr) {
-    const b = cacheLoadByte(state.dCache, state.memory, addr) | 0;
-    return (b << 24) >> 24;
-}
-
-function loadByteUnsigned(addr) {
-    return cacheLoadByte(state.dCache, state.memory, addr) | 0;
-}
-
-function storeByte(addr, value) {
-    cacheStoreByte(state.dCache, state.memory, addr, value, true);
-}
-
-function loadHalfword(addr) {
-    if (addr & 1) throw new Error("Unaligned halfword load");
-    const b0 = cacheLoadByte(state.dCache, state.memory, addr) | 0;
-    const b1 = cacheLoadByte(state.dCache, state.memory, addr + 1) | 0;
-    let hw = (b0 << 8) | b1;
-    hw = (hw << 16) >> 16;
-    return hw;
-}
-
-function loadHalfwordUnsigned(addr) {
-    if (addr & 1) throw new Error("Unaligned halfword load");
-    const b0 = cacheLoadByte(state.dCache, state.memory, addr) | 0;
-    const b1 = cacheLoadByte(state.dCache, state.memory, addr + 1) | 0;
-    return ((b0 << 8) | b1) & 0xFFFF;
-}
-
-function storeHalfword(addr, value) {
-    if (addr & 1) throw new Error("Unaligned halfword store");
-    cacheStoreByte(state.dCache, state.memory, addr,     (value >> 8) & 0xFF, true);
-    cacheStoreByte(state.dCache, state.memory, addr + 1, (value >> 0) & 0xFF, true);
-}
-
-function loadWord(addr) {
-    if (addr & 3) throw new Error("Unaligned word load");
-    const b0 = cacheLoadByte(state.dCache, state.memory, addr) | 0;
-    const b1 = cacheLoadByte(state.dCache, state.memory, addr + 1) | 0;
-    const b2 = cacheLoadByte(state.dCache, state.memory, addr + 2) | 0;
-    const b3 = cacheLoadByte(state.dCache, state.memory, addr + 3) | 0;
-    return ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) | 0;
-}
-
-export function storeWord(addr, value) {
-    if (addr & 3) throw new Error("Unaligned word store");
-    cacheStoreByte(state.dCache, state.memory, addr,     (value >>> 24) & 0xFF, true);
-    cacheStoreByte(state.dCache, state.memory, addr + 1, (value >>> 16) & 0xFF, true);
-    cacheStoreByte(state.dCache, state.memory, addr + 2, (value >>> 8)  & 0xFF, true);
-    cacheStoreByte(state.dCache, state.memory, addr + 3, (value >>> 0)  & 0xFF, true);
-}
-
-
-
-function storeWordRaw(addr, value) {
-    if (addr & 3) throw new Error("Unaligned word store");
-    const m = state.memory;
-    m[addr]     = (value >>> 24) & 0xFF;
-    m[addr + 1] = (value >>> 16) & 0xFF;
-    m[addr + 2] = (value >>> 8)  & 0xFF;
-    m[addr + 3] = (value >>> 0)  & 0xFF;
 }
 
 export function loadProgramFromSource(source) {
@@ -567,7 +450,6 @@ function execute(decoded, state) {
     }
     handler(decoded, state);
 }
-
 
 function buildCtrl(decoded) {
   if (!decoded) return {};

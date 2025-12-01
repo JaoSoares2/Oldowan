@@ -1,0 +1,26 @@
+// execute.js
+import { state } from './state.js';
+import { loadWord } from './memory.js'; // você já tinha algo assim
+import { decodeInstruction } from './decode.js'; // ou parser/decoder
+
+export function step() {
+  if (state.control.halted) return;
+
+  const pc = state.pc;
+
+  // 1. FETCH
+  const instrWord = loadWord(pc);   // lê 32 bits da memória
+
+  // 2. Atualiza PC (comportamento padrão, sobrescrito por branches/jumps)
+  state.pc = (pc + 4) | 0;
+
+  // 3. DECODE
+  const instr = decodeInstruction(instrWord);
+
+  // 4. EXECUTE
+  executeInstruction(instr);
+
+  // 5. Estatísticas / debug
+  state.perf.instructions++;
+  state.control.stepCount++;
+}
