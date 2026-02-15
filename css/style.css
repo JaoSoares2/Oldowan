@@ -4,7 +4,7 @@
 
 body {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: #f6f7fb;
+    background: radial-gradient(circle at 20% 20%, #eef2ff 0, #f6f7fb 40%, #fdfdfd 100%);
     color: #222;
     margin: 0;
     padding: 16px;
@@ -21,7 +21,7 @@ p {
 .controls {
     display: flex;
     gap: 8px;
-    margin: 12px 0;
+    align-items: center;
 }
 
 button {
@@ -38,10 +38,22 @@ button:hover {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+.secondary {
+    background: #eef2ff;
+    border-color: #d2d8ff;
+}
+
 .main-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: 1.2fr 1fr;
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+        "code pipeline"
+        "code regs"
+        "code cache"
+        "console ram";
     gap: 12px;
+    align-items: start;
 }
 
 .panel {
@@ -52,6 +64,13 @@ button:hover {
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
+.code-panel { grid-area: code; }
+.pipeline-panel { grid-area: pipeline; }
+.regs-panel { grid-area: regs; }
+.console-panel { grid-area: console; }
+.cache-panel { grid-area: cache; }
+.ram-panel { grid-area: ram; }
+
 .panel h2 {
     margin-top: 0;
     margin-bottom: 8px;
@@ -60,7 +79,7 @@ button:hover {
 
 textarea {
     width: 100%;
-    height: 250px;
+    height: 300px;
     font-family: "Cascadia Mono", "Fira Code", monospace;
     font-size: 14px;
     padding: 8px;
@@ -102,4 +121,76 @@ pre {
 .cache-conf {
     font-size: 12px;
     color: #555;
+}
+
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.table-container th,
+.table-container td {
+    border-bottom: 1px solid #eee;
+    padding: 4px 6px;
+    text-align: left;
+    font-family: "Cascadia Mono", "Fira Code", monospace;
+}
+
+.table-container tr:nth-child(odd) {
+    background: #fafafa;
+}
+
+.cache-stats {
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.console-box {
+    background: #0e0f16;
+    color: #8ef56f;
+    border-radius: 6px;
+    min-height: 160px;
+    max-height: 220px;
+    overflow: auto;
+    padding: 8px;
+    font-family: "Cascadia Mono", "Fira Code", monospace;
+    font-size: 12px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.badge {
+    background: #4c6fff;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    vertical-align: middle;
+}
+
+@media (max-width: 900px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "code"
+            "pipeline"
+            "regs"
+            "cache"
+            "ram"
+            "console";
+    }
 }

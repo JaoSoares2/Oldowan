@@ -1,13 +1,13 @@
 
-import { REGISTER_ALIAS } from './constants.js';
+import { REGISTER_ALIAS } from './constants.js?v=5';
 
 
 // Funções auxiliares para parsing
 export function parseRegister(token) {
     if (typeof token !== 'string') {
-        if(token === null || token === undefined){
+        if (token === null || token === undefined) {
             throw new Error(`Token inválido para registrador: ${token} \n Verifique se há vírgulas ou parênteses faltando na instrução.`);
-        }else{
+        } else {
             throw new Error(`Token deve ser uma string: ${token}`);
         }
     }

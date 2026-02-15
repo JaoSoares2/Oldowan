@@ -1,6 +1,120 @@
-import { VECTOR_CONSTANTS } from "./constantsMSAExtension";
+const bits = s => parseInt(s.replace(/\s+/g, ''), 2) >>> 0;
 
 
+export const BASE_FORMAT = {
+    R: {
+        fields: {
+            // Bit positions refer to the least-significant bit index within the word
+            opcode : { pos: 26, len: 6}, // bits 31..26
+            rs     : { pos: 21, len: 5}, // bits 25..21
+            rt     : { pos: 16, len: 5}, // bits 20..16
+            rd     : { pos: 11, len: 5}, // bits 15..11
+            shamt  : { pos: 6,  len: 5}, // bits 10..6
+            funct  : { pos: 0,  len: 6}  // bits 5..0
+        }
+    },
+    
+    I: {
+        fields: {
+            opcode: { pos: 26, len: 6 }, // bits 31..26
+            rs:     { pos: 21, len: 5 }, // bits 25..21
+            rt:     { pos: 16, len: 5 }, // bits 20..16
+            imm:    { pos: 0,  len: 16 } // bits 15..0
+        }
+    },
+
+    J: {
+        fields: {
+            opcode: { pos: 26, len: 6 }, // bits 31..26
+            target: { pos: 0,  len: 26 } // bits 25..0
+        }
+    }
+};
+
+
+export const ISA = {
+
+    // ========= R-TYPE =========
+    // Sintaxe Padrão: mnemonic rd, rs, rt
+    ADD:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100000") }, // funct=32
+    ADDU: { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100001") }, 
+    SUB:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100010") }, 
+    SUBU: { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100011") }, 
+    AND:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100100") }, 
+    OR:   { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100101") }, 
+    XOR:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100110") }, 
+    NOR:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 100111") }, 
+    SLT:  { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 101010") }, 
+    SLTU: { format: "R", syntax: "STD_3REG", base: bits("000000 00000 00000 00000 00000 101011") }, 
+
+    // Shifts
+    // Sintaxe Shift: mnemonic rd, rt, shamt
+    SLL:  { format: "R", syntax: "SHIFT", base: bits("000000 00000 00000 00000 00000 000000") }, 
+    SRL:  { format: "R", syntax: "SHIFT", base: bits("000000 00000 00000 00000 00000 000010") }, 
+    SRA:  { format: "R", syntax: "SHIFT", base: bits("000000 00000 00000 00000 00000 000011") }, 
+    
+    // Shifts Variáveis
+    // Sintaxe: mnemonic rd, rt, rs
+    SLLV: { format: "R", syntax: "SHIFT_V", base: bits("000000 00000 00000 00000 00000 000100") }, 
+    SRLV: { format: "R", syntax: "SHIFT_V", base: bits("000000 00000 00000 00000 00000 000110") }, 
+    SRAV: { format: "R", syntax: "SHIFT_V", base: bits("000000 00000 00000 00000 00000 000111") }, 
+
+    // Jumps / Moves Especiais
+    JR:   { format: "R", syntax: "JUMP_REG", base: bits("000000 00000 00000 00000 00000 001000") }, // jr rs
+    JALR: { format: "R", syntax: "JALR",     base: bits("000000 00000 00000 00000 00000 001001") }, // jalr rd, rs
+
+    MFHI: { format: "R", syntax: "RD_ONLY", base: bits("000000 00000 00000 00000 00000 010000") }, // mfhi rd
+    MTHI: { format: "R", syntax: "JUMP_REG", base: bits("000000 00000 00000 00000 00000 010001") }, // mthi rs (mesma sintaxe de JR)
+    MFLO: { format: "R", syntax: "RD_ONLY", base: bits("000000 00000 00000 00000 00000 010010") }, // mflo rd
+    MTLO: { format: "R", syntax: "JUMP_REG", base: bits("000000 00000 00000 00000 00000 010011") }, // mtlo rs
+
+    // Mult / Div (rs, rt)
+    MULT:  { format: "R", syntax: "RS_RT", base: bits("000000 00000 00000 00000 00000 011000") }, 
+    MULTU: { format: "R", syntax: "RS_RT", base: bits("000000 00000 00000 00000 00000 011001") }, 
+    DIV:   { format: "R", syntax: "RS_RT", base: bits("000000 00000 00000 00000 00000 011010") }, 
+    DIVU:  { format: "R", syntax: "RS_RT", base: bits("000000 00000 00000 00000 00000 011011") }, 
+
+    SYSCALL: { format: "R", syntax: "NO_ARGS", base: bits("000000 00000 00000 00000 00000 001100") }, 
+
+    // ========= I-TYPE =========
+    
+    // Aritmética Imediata: rt, rs, imm
+    ADDI:  { format: "I", syntax: "IMM_ARITH", base: bits("001000 00000 00000 0000000000000000") }, 
+    ADDIU: { format: "I", syntax: "IMM_ARITH", base: bits("001001 00000 00000 0000000000000000") }, 
+    SLTI:  { format: "I", syntax: "IMM_ARITH", base: bits("001010 00000 00000 0000000000000000") }, 
+    SLTIU: { format: "I", syntax: "IMM_ARITH", base: bits("001011 00000 00000 0000000000000000") }, 
+    ANDI:  { format: "I", syntax: "IMM_ARITH", base: bits("001100 00000 00000 0000000000000000") }, 
+    ORI:   { format: "I", syntax: "IMM_ARITH", base: bits("001101 00000 00000 0000000000000000") }, 
+    XORI:  { format: "I", syntax: "IMM_ARITH", base: bits("001110 00000 00000 0000000000000000") }, 
+    
+    // Load Upper Immediate: rt, imm
+    LUI:   { format: "I", syntax: "LOAD_UPPER", base: bits("001111 00000 00000 0000000000000000") }, 
+
+    // Loads / stores: rt, offset(rs)
+    LW:  { format: "I", syntax: "MEM_OFFSET", base: bits("100011 00000 00000 0000000000000000") }, 
+    SW:  { format: "I", syntax: "MEM_OFFSET", base: bits("101011 00000 00000 0000000000000000") }, 
+    LB:  { format: "I", syntax: "MEM_OFFSET", base: bits("100000 00000 00000 0000000000000000") }, 
+    LBU: { format: "I", syntax: "MEM_OFFSET", base: bits("100100 00000 00000 0000000000000000") }, 
+    LH:  { format: "I", syntax: "MEM_OFFSET", base: bits("100001 00000 00000 0000000000000000") }, 
+    LHU: { format: "I", syntax: "MEM_OFFSET", base: bits("100101 00000 00000 0000000000000000") }, 
+    SB:  { format: "I", syntax: "MEM_OFFSET", base: bits("101000 00000 00000 0000000000000000") }, 
+    SH:  { format: "I", syntax: "MEM_OFFSET", base: bits("101001 00000 00000 0000000000000000") }, 
+
+    // Branches: rs, rt, label
+    BEQ:  { format: "I", syntax: "BRANCH", base: bits("000100 00000 00000 0000000000000000") }, 
+    BNE:  { format: "I", syntax: "BRANCH", base: bits("000101 00000 00000 0000000000000000") }, 
+    
+    // Branch Zero: rs, label
+    BLEZ: { format: "I", syntax: "BRANCH_Z", base: bits("000110 00000 00000 0000000000000000") }, 
+    BGTZ: { format: "I", syntax: "BRANCH_Z", base: bits("000111 00000 00000 0000000000000000") }, 
+
+    // ========= J-TYPE =========
+    // Jumps: label
+    J:   { format: "J", syntax: "JUMP_LABEL", base: bits("000010 00000000000000000000000000") }, 
+    JAL: { format: "J", syntax: "JUMP_LABEL", base: bits("000011 00000000000000000000000000") } 
+};
+
+/* ISA antiga - manter apenas para referência
 export const ISA = {
 
     //Aritmética e Lógica
@@ -76,6 +190,7 @@ export const ISA = {
     J:    { type: "J", opcode: 2 }, // salto direto
     JAL:  { type: "J", opcode: 3 }  // salto com link
 };
+*/
 
 export const REGISTER_ALIAS = {
     "$0": 0,  "$1": 1,  "$2": 2,  "$3": 3,
@@ -114,6 +229,7 @@ export const CONSTANTS = {
     ],
    
     ISA, // conjunto de instruções
+    MEM_SIZE: { BYTE: 1, HALF: 2, WORD: 4 },
 
     // Limite de ciclos para detectar loops infinitos
     INFINITE_LOOP_THRESHOLD: 10000, 
@@ -131,4 +247,3 @@ export const CONSTANTS = {
 
 
 };
-

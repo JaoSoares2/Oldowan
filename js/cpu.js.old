@@ -3,6 +3,13 @@ import { state } from './state.js';
 import { loadWord } from './memory.js'; // você já tinha algo assim
 import { decodeInstruction } from './decode.js'; // ou parser/decoder
 
+const decoded = registry.decode(instructionWord);
+if (decoded) {
+   decoded.handler(decoded, state);
+} else {
+   // Exception: Reserved Instruction
+}
+
 export function step() {
   if (state.control.halted) return;
 

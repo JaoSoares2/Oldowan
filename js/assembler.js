@@ -1,31 +1,134 @@
-import { CONSTANTS } from './constants.js';
-import { encodeR, encodeI, encodeJ } from './encode.js';
-import { parseRegister, parseImmediate } from './parse.js';
+import { registry } from './instructions.js?v=5';
+import { parseRegister, parseImmediate } from './parse.js?v=5';
 
+// --- Helpers de Parsing de Texto ---
 
-
-// Remove comentários de uma linha
 function stripComment(line) {
-    // suporta ;  #  //
     return line.split(';')[0].split('#')[0].split('//')[0];
 }
 
-// Separa label e instrução em uma linha
 function splitLabelAndInstr(line) {
     const idx = line.indexOf(':');
-    if (idx === -1) {
-        return { label: null, instr: line.trim() };
-    }
-    const label = line.slice(0, idx).trim();
-    const instr = line.slice(idx + 1).trim();
-    return { label: label || null, instr };
+    if (idx === -1) return { label: null, instr: line.trim() };
+    return {
+        label: line.slice(0, idx).trim() || null,
+        instr: line.slice(idx + 1).trim()
+    };
 }
 
-// Primeira passagem do assembler: coleta labels e calcula tamanho do código
+function tokenizeInstr(instr) {
+    // Quebra por vírgulas, parênteses e espaços, removendo vazios
+    // Ex: "LW $t0, 4($sp)" -> ["LW", "$t0", "4", "$sp"]
+    return instr.split(/[\s,()]+/).filter(t => t.length > 0);
+}
+
+// --- Estratégias de Sintaxe (Syntax Parsers) ---
+// Define como mapear os tokens para os campos da instrução
+
+const SYNTAX_PARSERS = {
+    // Padrões Base
+    'STD_3REG': (args) => ({ rd: parseRegister(args[0]), rs: parseRegister(args[1]), rt: parseRegister(args[2]) }),
+    'SHIFT': (args) => ({ rd: parseRegister(args[0]), rt: parseRegister(args[1]), shamt: parseImmediate(args[2]) & 0x1F }),
+    'SHIFT_V': (args) => ({ rd: parseRegister(args[0]), rt: parseRegister(args[1]), rs: parseRegister(args[2]) }), // rd, rt, rs
+    'JUMP_REG': (args) => ({ rs: parseRegister(args[0]) }),
+    'RD_ONLY': (args) => ({ rd: parseRegister(args[0]) }),
+    'RS_RT': (args) => ({ rs: parseRegister(args[0]), rt: parseRegister(args[1]) }),
+    'IMM_ARITH': (args) => ({ rt: parseRegister(args[0]), rs: parseRegister(args[1]), imm: parseImmediate(args[2]) }),
+    'MEM_OFFSET': (args) => ({ rt: parseRegister(args[0]), imm: parseImmediate(args[1]), rs: parseRegister(args[2]) }), // rt, imm(rs)
+    'LOAD_UPPER': (args) => ({ rt: parseRegister(args[0]), imm: parseImmediate(args[1]) }),
+    'JUMP_LABEL': (args, pc, labels) => {
+        const target = labels[args[0]];
+        if (target === undefined) throw new Error(`Label not found: ${args[0]}`);
+        return { target: (target >>> 2) & 0x03FFFFFF };
+    },
+    'BRANCH': (args, pc, labels) => { // BEQ rs, rt, label
+        const target = labels[args[2]];
+        if (target === undefined) throw new Error(`Label not found: ${args[2]}`);
+        return { rs: parseRegister(args[0]), rt: parseRegister(args[1]), imm: (target - (pc + 4)) >> 2 };
+    },
+    'BRANCH_Z': (args, pc, labels) => { // BLEZ rs, label
+        const target = labels[args[1]];
+        if (target === undefined) throw new Error(`Label not found: ${args[1]}`);
+        return { rs: parseRegister(args[0]), rt: 0, imm: (target - (pc + 4)) >> 2 };
+    },
+    'NO_ARGS': () => ({}),
+
+    // Padrões MSA (Novos!)
+    'MSA_I8': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), i8: parseImmediate(args[2]) }), // ANDI.B wd, ws, imm_u8
+    'MSA_I5': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), i5: parseImmediate(args[2]) }), // ADDVI wd, ws, imm_s5
+    'MSA_BIT': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), i7: parseImmediate(args[2]) }), // SLLI wd, ws, imm_m7
+    'MSA_VEC': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), wt: parseRegister(args[2]) }), // AND.V wd, ws, wt
+    'MSA_3R': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), wt: parseRegister(args[2]) }), // ADDV.W wd, ws, wt
+    'MSA_2R': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]) }),
+    'MSA_ELM': (args) => ({ wd: parseRegister(args[0]), ws: parseRegister(args[1]), n: parseImmediate(args[2]) }), // SPLATI.W wd, ws[n] (Simplificado)
+    'MSA_MI10': (args) => ({ wd: parseRegister(args[0]), s10: parseImmediate(args[1]), rs: parseRegister(args[2]) }), // LD.W wd, off(rs)
+    //!  'MSA_BRANCH': tem que ver como fazer esse 
+    // ... Adicionar outros conforme necessidade
+};
+
+
+// --- Core Encoding Logic ---
+
+function packBits(instrDef, values) {
+    let word = instrDef.match; // Começa com os bits de opcode/funct já setados
+
+    for (const [field, info] of Object.entries(instrDef.fields)) {
+        // Se o campo está nos valores extraídos (ex: rs, rt, imm)
+        if (values[field] !== undefined) {
+            const val = values[field];
+            // Truncar para o tamanho do campo (mask)
+            const mask = (1 << info.len) - 1;
+            const bits = (val & mask) >>> 0;
+            // Shift para a posição correta
+            word |= (bits << info.pos);
+        }
+    }
+    return word >>> 0; // Unsigned 32-bit return
+}
+
+export function encodeOneInstruction(line, pc, labels) {
+    const tokens = tokenizeInstr(line);
+    if (tokens.length === 0) return null;
+
+    const mnemonic = tokens[0].toUpperCase();
+    const args = tokens.slice(1);
+
+    // 1. Tratamento de Pseudo-Instruções (Macro Expansion simplificada)
+    if (mnemonic === 'MOVE') {
+        // move rd, rs -> addu rd, rs, $zero
+        return encodeOneInstruction(`ADDU ${args[0]}, ${args[1]}, $zero`, pc, labels);
+    }
+    // LI (Load Immediate) de 32 bits gera 2 instruções (LUI + ORI). 
+    // O assembler atual retorna array de words? Não, retorna 1 word.
+    // TODO: Implementar expansão de macro multilinhas.
+
+    // 2. Busca no Registry
+    const instrDef = registry.instructions.get(mnemonic);
+    if (!instrDef) {
+        throw new Error(`Unknown instruction: ${mnemonic}`);
+    }
+
+    // 3. Determinar Parser de Sintaxe
+    const strategyKey = registry.getSyntaxStrategy(mnemonic);
+    if (!strategyKey) {
+        throw new Error(`No syntax strategy defined for ${mnemonic}`);
+    }
+
+    // 4. Parsear Argumentos
+    const parser = typeof strategyKey === 'function' ? strategyKey : SYNTAX_PARSERS[strategyKey];
+    const fieldValues = parser(args, pc, labels);
+
+    // 5. Empacotar Bits
+    return packBits(instrDef, fieldValues);
+}
+
+
+// --- API Pública ---
+
 export function firstPass(source) {
     const lines = source.split('\n');
     const labels = {};
-    let pc = 0; 
+    let pc = 0;
 
     for (const rawLine of lines) {
         let line = stripComment(rawLine).trim();
@@ -34,249 +137,66 @@ export function firstPass(source) {
         const { label, instr } = splitLabelAndInstr(line);
 
         if (label) {
-            if (labels[label] !== undefined) {
-                throw new Error(`Label duplicado: ${label}`);
-            }
-            labels[label] = pc; // endereço em bytes
+            if (labels[label] !== undefined) throw new Error(`Duplicate label: ${label}`);
+            labels[label] = pc;
         }
 
         if (instr) {
-            // conta uma instrução = 4 bytes
-            pc += 4;
+            const tokens = tokenizeInstr(instr);
+            if (tokens.length > 0) {
+                const mnemonic = tokens[0].toUpperCase();
+                // Check Pseudo-Ops length
+                if (mnemonic === 'LI' || mnemonic === 'LA') {
+                    pc += 8; // Expande para 2 instruções (LUI + ORI)
+                } else {
+                    pc += 4;
+                }
+            }
         }
     }
-
     return { labels, codeSize: pc };
 }
 
-// Tokeniza uma instrução em seus componentes
-function tokenizeInstr(instr) {
-    // separa por espaços, vírgulas e parênteses (pra LW rt, offset(rs))
-    return instr.split(/[\s,()]+/).filter(t => t.length > 0);
-}
-
-
-//! Fazer pseudo li instrução aqui 
-// Codifica uma instrução MIPS em uma palavra de 32 bits
- export function encodeOneInstruction(instrLine, pc, labels) {
-    const tokens = tokenizeInstr(instrLine);
-    if (tokens.length === 0) {
-        return null;
-    }
-
-    let mnemonic = tokens[0].toUpperCase();
-    const args = tokens.slice(1);
-
-
-    const info = CONSTANTS.ISA[mnemonic];
-    if (!info) {
-        throw new Error(`Instrução desconhecida: ${mnemonic}`);
-    }
-
-    // R-TYPE
-    if (info.type === 'R') {
-        const opcode = info.opcode;
-        const funct  = info.funct;
-
-        switch (mnemonic) {
-            case 'ADD':
-            case 'ADDU':
-            case 'SUB':
-            case 'SUBU':
-            case 'AND':
-            case 'OR':
-            case 'XOR':
-            case 'NOR':
-            case 'SLT':
-            case 'SLTU': {
-           
-                const rd = parseRegister(args[0]);
-                const rs = parseRegister(args[1]);
-                const rt = parseRegister(args[2]);
-                return encodeR(opcode, rs, rt, rd, 0, funct);
-            }
-
-            case 'SLL':
-            case 'SRL':
-            case 'SRA': {
-             
-                const rd = parseRegister(args[0]);
-                const rt = parseRegister(args[1]);
-                const shamt = parseImmediate(args[2]) & 0x1F;
-                // rs = 0
-                return encodeR(opcode, 0, rt, rd, shamt, funct);
-            }
-
-            case 'SLLV':
-            case 'SRLV':
-            case 'SRAV': {
-              
-                const rd = parseRegister(args[0]);
-                const rt = parseRegister(args[1]);
-                const rs = parseRegister(args[2]);
-                return encodeR(opcode, rs, rt, rd, 0, funct);
-            }
-
-            case 'JR': {
-                
-                const rs = parseRegister(args[0]);
-                return encodeR(opcode, rs, 0, 0, 0, funct);
-            }
-
-            case 'JALR': {
-                
-                const rd = parseRegister(args[0]);
-                const rs = parseRegister(args[1]);
-                return encodeR(opcode, rs, 0, rd, 0, funct);
-            }
-
-            case 'MFHI':
-            case 'MFLO': {
-            
-                const rd = parseRegister(args[0]);
-                return encodeR(opcode, 0, 0, rd, 0, funct);
-            }
-
-            case 'MTHI':
-            case 'MTLO': {
-
-                const rs = parseRegister(args[0]);
-                return encodeR(opcode, rs, 0, 0, 0, funct);
-            }
-
-            case 'MULT':
-            case 'MULTU':
-            case 'DIV':
-            case 'DIVU': {
-
-                const rs = parseRegister(args[0]);
-                const rt = parseRegister(args[1]);
-                return encodeR(opcode, rs, rt, 0, 0, funct);
-            }
-
-            case 'SYSCALL': {
-                return encodeR(0, 0, 0, 0, 0, info.funct);
-            }
-
-            
-            default:
-                throw new Error(`R-type ainda não tratado no assembler: ${mnemonic}`);
-        }
-    }
-
-    // I-TYPE
-    if (info.type === 'I') {
-        const opcode = info.opcode;
-
-        switch (mnemonic) {
-            case 'ADDI':
-            case 'ADDIU':
-            case 'SLTI':
-            case 'SLTIU':
-            case 'ANDI':
-            case 'ORI':
-            case 'XORI': {
-         
-                const rt   = parseRegister(args[0]);
-                const rs   = parseRegister(args[1]);
-                const imm  = parseImmediate(args[2]) & 0xFFFF;
-                return encodeI(opcode, rs, rt, imm);
-            }
-
-            case 'LI':
-            case 'LUI':{
-                const rt   = parseRegister(args[0]);
-                const imm  = parseImmediate(args[1]);
-                return encodeI(15, 0, rt, (imm >>> 16) & 0xFFFF) << 16 | encodeI(15, 0, rt, imm & 0xFFFF); // 
-            }
-
-
-            case 'LW':
-            case 'SW':
-            case 'LB':
-            case 'LBU':
-            case 'LH':
-            case 'LHU':
-            case 'SB':
-            case 'SH': {
-          
-                const rt     = parseRegister(args[0]);
-                const offset = parseImmediate(args[1]);
-                const rs     = parseRegister(args[2]);
-                return encodeI(opcode, rs, rt, offset & 0xFFFF);
-            }
-
-            case 'BEQ':
-            case 'BNE': {
-         
-                const rs = parseRegister(args[0]);
-                const rt = parseRegister(args[1]);
-                const label = args[2];
-                const targetAddr = labels[label];
-                if (targetAddr === undefined) {
-                    throw new Error(`Label não encontrado: ${label}`);
-                }
-
-                // offset = (target - (pc + 4)) / 4
-                const offset = ((targetAddr - (pc + 4)) >> 2);
-                return encodeI(opcode, rs, rt, offset & 0xFFFF);
-            }
-
-            case 'BLEZ':
-            case 'BGTZ':
-            
-                const rs = parseRegister(args[0]);
-                const label = args[1];
-                const targetAddr = labels[label];
-                if (targetAddr === undefined) {
-                    throw new Error(`Label não encontrado: ${label}`);
-                }
-
-                // offset = (target - (pc + 4)) / 4
-                const offset = ((targetAddr - (pc + 4)) >> 2);
-                return encodeI(opcode, rs, 0, offset & 0xFFFF);
-
-            default:
-                throw new Error(`I-type ainda não tratado no assembler: ${mnemonic}`);
-
-        }
-    }
-
-    // J-TYPE
-    if (info.type === 'J') {
-        const opcode = info.opcode;
-
-        // j label
-        const label = args[0];
-        const targetAddr = labels[label];
-        if (targetAddr === undefined) {
-            throw new Error(`Label não encontrado: ${label}`);
-        }
-
-        // target = endereço em words (bits 27..2 da word)
-        const target26 = (targetAddr >> 2) & 0x03FFFFFF;
-        return encodeJ(opcode, target26);
-    }
-
-    throw new Error(`Tipo de instrução desconhecido: ${info.type}`);
-}
-
-// Monta o código fonte MIPS em um array de palavras (32 bits)
 export function assemble(source) {
-    const lines = source.split('\n');
-
-    // 1ª passada: labels
     const { labels, codeSize } = firstPass(source);
-
     const words = [];
     let pc = 0;
+    const lines = source.split('\n');
 
     for (const rawLine of lines) {
         let line = stripComment(rawLine).trim();
         if (!line) continue;
 
-        const { label, instr } = splitLabelAndInstr(line);
-        if (!instr) continue; 
+        const { instr } = splitLabelAndInstr(line);
+        if (!instr) continue;
+
+        const tokens = tokenizeInstr(instr);
+        const mnemonic = tokens[0].toUpperCase();
+
+        // Tratamento especial para LI/LA (Pseudos de 2 linhas)
+        // necessário até ter um pré-processador de macros real
+        if (mnemonic === 'LI' || mnemonic === 'LA') {
+            const rt = tokens[1];
+            const immVal = (mnemonic === 'LI') ? parseImmediate(tokens[2]) : labels[tokens[2]];
+
+            if (immVal === undefined) throw new Error(`Unresolved symbol for LA: ${tokens[2]}`);
+
+            const upper = (immVal >>> 16) & 0xFFFF;
+            const lower = immVal & 0xFFFF;
+
+            // Gera LUI
+            const luiWord = encodeOneInstruction(`LUI ${rt}, ${upper}`, pc, labels);
+            words.push(luiWord);
+            pc += 4;
+
+            // Gera ORI
+            const oriWord = encodeOneInstruction(`ORI ${rt}, ${rt}, ${lower}`, pc, labels);
+            words.push(oriWord);
+            pc += 4;
+            continue;
+        }
+
+        // Instrução Padrão
         const word = encodeOneInstruction(instr, pc, labels);
         if (word !== null) {
             words.push(word >>> 0);
@@ -284,5 +204,5 @@ export function assemble(source) {
         }
     }
 
-    return { words, labels, codeSize };
+    return { words, labels, codeSize: pc };
 }

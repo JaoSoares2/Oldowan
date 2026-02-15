@@ -111,71 +111,69 @@ const FORMATS = {
 
 
 export const ISA_MSA = {
-    // I8                                MSA   OP    i8      WS   WD    MINOR
-    ANDI_B: { format: 'I8', base: bits('011110 00 00000000 00000 00000 000000') }, // vetor rd = vetor rs & imediato_u8 (.B)
-    OR_B :  { format: 'I8', base: bits('011110 01 00000000 00000 00000 000000') }, // vetor rd = vetor rs | imediato_u8 (.B)
-    NORI_B :{ format: 'I8', base: bits('011110 10 00000000 00000 00000 000000') }, // vetor rd = ~(vetor rs | imediato_u8 (.B)
-    XORI_B :{ format: 'I8', base: bits('011110 11 00000000 00000 00000 000000') }, // vetor rd = vetor rs ^ imediato_u8 (.B)
+    // I8                                                  MSA   OP    i8      WS   WD    MINOR
+    ANDI_B: { format: 'I8', syntax: 'MSA_I8', base: bits('011110 00 00000000 00000 00000 000000') }, // vetor rd = vetor rs & imediato_u8 (.B)
+    OR_B :  { format: 'I8', syntax: 'MSA_I8', base: bits('011110 01 00000000 00000 00000 000000') }, // vetor rd = vetor rs | imediato_u8 (.B)
+    NORI_B :{ format: 'I8', syntax: 'MSA_I8', base: bits('011110 10 00000000 00000 00000 000000') }, // vetor rd = ~(vetor rs | imediato_u8 (.B)
+    XORI_B :{ format: 'I8', syntax: 'MSA_I8', base: bits('011110 11 00000000 00000 00000 000000') }, // vetor rd = vetor rs ^ imediato_u8 (.B)
 
 
-    // I5                                MSA    OP DF   i5    WS    WD   MINOR
-    ADDVI:  { format: 'I5', base: bits('011110 000 00 00000 00000 00000 000110') }, // vetor rd = vetor rs + imediato_s5
-    SUBVI:  { format: 'I5', base: bits('011110 001 00 00000 00000 00000 000110') }, // vetor rd = vetor rs - imediato_s5
+    // I5                                                  MSA    OP DF   i5    WS    WD   MINOR
+    ADDVI:  { format: 'I5', syntax: 'MSA_I5', base: bits('011110 000 00 00000 00000 00000 000110') }, // vetor rd = vetor rs + imediato_s5
+    SUBVI:  { format: 'I5', syntax: 'MSA_I5', base: bits('011110 001 00 00000 00000 00000 000110') }, // vetor rd = vetor rs - imediato_s5
 
-    CEQI:   { format: 'I5', base: bits('011110 000 00 00000 00000 00000 000111') }, // vetor rd = (vetor rs == imediato_s5)
+    CEQI:   { format: 'I5', syntax: 'MSA_I5', base: bits('011110 000 00 00000 00000 00000 000111') }, // vetor rd = (vetor rs == imediato_s5)
 
-    // BIT                                MSA   OP   DF/M    WS    WD   MINOR    
-    SLLI:   { format: 'BIT', base: bits('011110 000 0000000 00000 00000 001001')}, // vetor rd = vetor rs << imediato_m7
-    BSETI:  { format: 'BIT', base: bits('011110 100 0000000 00000 00000 001001')}, // vetor rd = vetor rs com bit imediato_m7 setado
+    // BIT                                                   MSA   OP   DF/M    WS    WD   MINOR    
+    SLLI:   { format: 'BIT', syntax: 'MSA_BIT', base: bits('011110 000 0000000 00000 00000 001001')}, // vetor rd = vetor rs << imediato_m7
+    BSETI:  { format: 'BIT', syntax: 'MSA_BIT', base: bits('011110 100 0000000 00000 00000 001001')}, // vetor rd = vetor rs com bit imediato_m7 setado
 
-    // 3R                                MSA   OP  DF   WT    WS    WD   MINOR
-    SLL:    { format: '3R', base: bits('011110 000 00 00000 00000 00000 001101')}, // vetor rd = vetor rs << vetor rt
-    SRA:    { format: '3R', base: bits('011110 001 00 00000 00000 00000 001101')}, // vetor rd = vetor rs >> vetor rt (aritmético)
-    SRL:    { format: '3R', base: bits('011110 010 00 00000 00000 00000 001101')}, // vetor rd = vetor rs >> vetor rt (lógico)
-    BSET:   { format: '3R', base: bits('011110 100 00 00000 00000 00000 001101')}, // vetor rd = vetor rs com bit de vetor rt setado
+    // 3R                                                MSA   OP  DF   WT    WS    WD   MINOR
+    SLL:    { format: '3R',syntax: 'MSA_3R', base: bits('011110 000 00 00000 00000 00000 001101')}, // vetor rd = vetor rs << vetor rt
+    SRA:    { format: '3R',syntax: 'MSA_3R', base: bits('011110 001 00 00000 00000 00000 001101')}, // vetor rd = vetor rs >> vetor rt (aritmético)
+    SRL:    { format: '3R',syntax: 'MSA_3R', base: bits('011110 010 00 00000 00000 00000 001101')}, // vetor rd = vetor rs >> vetor rt (lógico)
+    BSET:   { format: '3R',syntax: 'MSA_3R', base: bits('011110 100 00 00000 00000 00000 001101')}, // vetor rd = vetor rs com bit de vetor rt setado
     
-    ADDV:   { format: '3R', base: bits('011110 000 00 00000 00000 00000 001110')}, // vetor rd = vetor rs + vetor rt 
-    SUBV:   { format: '3R', base: bits('011110 001 00 00000 00000 00000 001110')}, // vetor rd = vetor rs - vetor rt 
-    CEQ:    { format: '3R', base: bits('011110 000 00 00000 00000 00000 001111')}, // vetor rd = (vetor rs == vetor rt) 
-    MULV:   { format: '3R', base: bits('011110 000 00 00000 00000 00000 010010')}, // vetor rd = vetor rs * vetor rt
-    DIV_S:  { format: '3R', base: bits('011110 100 00 00000 00000 00000 010010')}, // vetor rd = vetor rs / vetor rt (float single)
-    DIV_U:  { format: '3R', base: bits('011110 101 00 00000 00000 00000 010010')}, // vetor rd = vetor rs / vetor rt (unsigned int)
+    ADDV:   { format: '3R',syntax: 'MSA_3R', base: bits('011110 000 00 00000 00000 00000 001110')}, // vetor rd = vetor rs + vetor rt 
+    SUBV:   { format: '3R',syntax: 'MSA_3R', base: bits('011110 001 00 00000 00000 00000 001110')}, // vetor rd = vetor rs - vetor rt 
+    CEQ:    { format: '3R',syntax: 'MSA_3R', base: bits('011110 000 00 00000 00000 00000 001111')}, // vetor rd = (vetor rs == vetor rt) 
+    MULV:   { format: '3R',syntax: 'MSA_3R', base: bits('011110 000 00 00000 00000 00000 010010')}, // vetor rd = vetor rs * vetor rt
+    DIV_S:  { format: '3R',syntax: 'MSA_3R', base: bits('011110 100 00 00000 00000 00000 010010')}, // vetor rd = vetor rs / vetor rt (float single)
+    DIV_U:  { format: '3R',syntax: 'MSA_3R', base: bits('011110 101 00 00000 00000 00000 010010')}, // vetor rd = vetor rs / vetor rt (unsigned int)
 
-    ILVL:   { format: '3R', base: bits('011110 100 00 00000 00000 00000 010100')}, // interleave lower halves
-    SPLAT:  { format: '3R', base: bits('011110 001 00 00000 00000 00000 010100')}, // vetor rd = splat(rs)
+    ILVL:   { format: '3R',syntax: 'MSA_3R', base: bits('011110 100 00 00000 00000 00000 010100')}, // interleave lower halves
+    SPLAT:  { format: '3R',syntax: 'MSA_3R', base: bits('011110 001 00 00000 00000 00000 010100')}, // vetor rd = splat(rs)
 
-    // ELM                               MSA     OP   DF/N   WS    WD   MINOR
-    SPLATI: { format: 'ELM', base: bits('011110 0001 000000 00000 00000 011001')}, // vetor rd = splat elemento n de rs
-    COPY_S: { format: 'ELM', base: bits('011110 0010 000000 00000 00000 011001')}, // vetor rd = copy elemento_s de rs
-    MOVE_V: { format: 'ELM', base: bits('011110 0010 111110 00000 00000 011001')}, // vetor rd = vetor rs (move)
-    COPY_U: { format: 'ELM', base: bits('011110 0011 000000 00000 00000 011001')}, // vetor rd = copy elemento_u de rs
-    INSERT: { format: 'ELM', base: bits('011110 0100 000000 00000 00000 011001')}, // vetor rd = insert elemento de rt em rs
+    // ELM                                                   MSA     OP   DF/N   WS    WD   MINOR
+    SPLATI: { format: 'ELM', syntax: 'MSA_ELM', base: bits('011110 0001 000000 00000 00000 011001')}, // vetor rd = splat elemento n de rs
+    COPY_S: { format: 'ELM', syntax: 'MSA_ELM', base: bits('011110 0010 000000 00000 00000 011001')}, // vetor rd = copy elemento_s de rs
+    MOVE_V: { format: 'ELM', syntax: 'MSA_ELM', base: bits('011110 0010 111110 00000 00000 011001')}, // vetor rd = vetor rs (move)
+    COPY_U: { format: 'ELM', syntax: 'MSA_ELM', base: bits('011110 0011 000000 00000 00000 011001')}, // vetor rd = copy elemento_u de rs
+    INSERT: { format: 'ELM', syntax: 'MSA_ELM', base: bits('011110 0100 000000 00000 00000 011001')}, // vetor rd = insert elemento de rt em rs
+    // VEC                                                   MSA     OP     WT    WS    WD   MINOR
+    AND_V:  { format: 'VEC', syntax: 'MSA_VEC', base: bits('011110 00000 00000 00000 00000 011110')}, // vetor rd = vetor rs & vetor rt
+    OR_V:   { format: 'VEC', syntax: 'MSA_VEC', base: bits('011110 00001 00000 00000 00000 011110')}, // vetor rd = vetor rs | vetor rt
+    NOR_V:  { format: 'VEC', syntax: 'MSA_VEC', base: bits('011110 00010 00000 00000 00000 011110')}, // vetor rd = ~(vetor rs | vetor rt)
+    XOR_V:  { format: 'VEC', syntax: 'MSA_VEC', base: bits('011110 00011 00000 00000 00000 011110')}, // vetor rd = vetor rs ^ vetor rt
+    
+    // 2R                                                  MSA      OP    DF   WS    WD   MINOR
+    FILL:   { format: '2R', syntax: 'MSA_2R', base: bits('011110 11000000 00 00000 00000 011110' )}, // vetor rd = splat valor de rt
 
-    // VEC                               MSA     OP     WT    WS    WD   MINOR
-    AND_V:  { format: 'VEC', base: bits('011110 00000 00000 00000 00000 011110')}, // vetor rd = vetor rs & vetor rt
-    OR_V:   { format: 'VEC', base: bits('011110 00001 00000 00000 00000 011110')}, // vetor rd = vetor rs | vetor rt
-    NOR_V:  { format: 'VEC', base: bits('011110 00010 00000 00000 00000 011110')}, // vetor rd = ~(vetor rs | vetor rt)
-    XOR_V:  { format: 'VEC', base: bits('011110 00011 00000 00000 00000 011110')}, // vetor rd = vetor rs ^ vetor rt
+    // MI10                                                    MSA      S10      RS     WD  MINOR DF
+    LD:     { format: 'MI10', syntax: 'MSA_MI10', base: bits('011110 0000000000 00000 00000 1000 00')}, // vetor rd = Mem[rs + imediato_s10 * tamanho_elemento]
+    ST:     { format: 'MI10', syntax: 'MSA_MI10', base: bits('011110 0000000000 00000 00000 1001 00')}, // Mem[rs + imediato_s10 * tamanho_elemento] = vetor rd
 
-    // 2R                                MSA      OP    DF   WS    WD   MINOR
-    FILL:   { format: '2R', base: bits('011110 11000000 00 00000 00000 011110' )}, // vetor rd = splat valor de rt
-
-    // MI10                                MSA      S10      RS     WD  MINOR DF
-    LD:     { format: 'MI10', base: bits('011110 0000000000 00000 00000 1000 00')}, // vetor rd = Mem[rs + imediato_s10 * tamanho_elemento]
-    ST:     { format: 'MI10', base: bits('011110 0000000000 00000 00000 1001 00')}, // Mem[rs + imediato_s10 * tamanho_elemento] = vetor rd
-
-    // BRANCH_MSA                               COP1   OP DF   WT         S16
-    BZ_V:  { format: 'BRANCH_MSA', base: bits('010001 010 11 00000 0000000000000000') },
-    BZ_B:  { format: 'BRANCH_MSA', base: bits('010001 110 00 00000 0000000000000000') },
-    BZ_H:  { format: 'BRANCH_MSA', base: bits('010001 110 01 00000 0000000000000000') },
-    BZ_W:  { format: 'BRANCH_MSA', base: bits('010001 110 10 00000 0000000000000000') },
-    BZ_D:  { format: 'BRANCH_MSA', base: bits('010001 110 11 00000 0000000000000000') },
-
-    BNZ_V: { format: 'BRANCH_MSA', base: bits('010001 011 11 00000 0000000000000000') },
-    BNZ_B: { format: 'BRANCH_MSA', base: bits('010001 111 00 00000 0000000000000000') },
-    BNZ_H: { format: 'BRANCH_MSA', base: bits('010001 111 01 00000 0000000000000000') },
-    BNZ_W: { format: 'BRANCH_MSA', base: bits('010001 111 10 00000 0000000000000000') },
-    BNZ_D: { format: 'BRANCH_MSA', base: bits('010001 111 11 00000 0000000000000000') },
+    // BRANCH_MSA                                                     COP1   OP DF   WT         S16
+    BZ_V:  { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 010 11 00000 0000000000000000') },
+    BZ_B:  { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 110 00 00000 0000000000000000') },
+    BZ_H:  { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 110 01 00000 0000000000000000') },
+    BZ_W:  { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 110 10 00000 0000000000000000') },
+    BZ_D:  { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 110 11 00000 0000000000000000') },
+    BNZ_V: { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 011 11 00000 0000000000000000') },
+    BNZ_B: { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 111 00 00000 0000000000000000') },
+    BNZ_H: { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 111 01 00000 0000000000000000') },
+    BNZ_W: { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 111 10 00000 0000000000000000') },
+    BNZ_D: { format: 'BRANCH_MSA', syntax: 'MSA_BRANCH', base: bits('010001 111 11 00000 0000000000000000') },
 }
 
 
