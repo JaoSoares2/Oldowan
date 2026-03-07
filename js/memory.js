@@ -1,6 +1,6 @@
-import { state } from './state.js?v=5';
-import { CONSTANTS } from './constants.js?v=5';
-import { cacheLoadByte, cacheStoreByte } from './cache.js?v=5';
+import { state } from './state.js?v=6';
+import { CONSTANTS } from './constants.js?v=6';
+import { cacheLoadByte, cacheStoreByte } from './cache.js?v=6';
 
 // Wrapper para acesso via DataView
 // O DataView exige um ArrayBuffer. Como a memória é Uint8Array, é usado state.memory.buffer.

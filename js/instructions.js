@@ -1,13 +1,13 @@
 /**
- * MIPSweb - Instruction Registry & Control Unit (Hardware-First)
+ * Instruction Registry & Control Unit (Hardware-First)
  * * Simula as tabelas de verdade do hardware (Main Control e ALU Control).
  * Decodifica puramente baseada em Opcode e Funct (Bits), não em nomes.
  */
 
-import { ISA, BASE_FORMAT, CONSTANTS } from './constants.js?v=5';
-import { ALU_CODES } from './constantsALU.js?v=5';
-import { getALUControl, ALU_OP } from './controlALU.js?v=5';
-import { MDU_OPS } from './mdu.js?v=5';
+import { ISA, BASE_FORMAT, CONSTANTS } from './constants.js?v=6';
+import { ALU_CODES } from './constantsALU.js?v=6';
+import { getALUControl, ALU_OP } from './controlALU.js?v=6';
+import { MDU_OPS } from './mdu.js?v=6';
 
 const signExtend16 = (v) => (v << 16) >> 16;
 const zeroExtend16 = (v) => v & 0xFFFF;

@@ -1,17 +1,17 @@
-/**
- * MIPSweb - Main Controller
- * Conecta UI, Assembler e Execution Engine.
- */
-import { assemble } from './assembler.js?v=5';
-import { state } from './state.js?v=5';
-import { CONSTANTS } from './constants.js?v=5';
-// Importa o novo motor de execução
-import { step, stepPipeline, initCpu } from './execution.js?v=5';
-// Importa o registro de instruções para inicializá-lo
-import { registry } from './instructions.js?v=5';
+import { assemble } from './assembler.js?v=6';
+import { state } from './state.js?v=6';
+import { CONSTANTS } from './constants.js?v=6';
+import { step, stepPipeline, initCpu } from './execution.js?v=6';
+import { registry } from './instructions.js?v=6';
+import { translations, setLanguage, currentLanguage } from './language.js';
 
 const fmtHex = (v) => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(8, '0'));
 const fmtByte = (v) => ((v & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
+
+function t(key, ...args) {
+    const entry = translations[currentLanguage][key];
+    return typeof entry === 'function' ? entry(...args) : entry;
+}
 
 // Elementos da UI
 const txtAsm = document.getElementById('asmInput');
@@ -21,6 +21,7 @@ const btnStepPipeline = document.getElementById('btnStepPipeline');
 const btnReset = document.getElementById('btnReset');
 const btnDelaySlot = document.getElementById('btnDelaySlot');
 const outputDiv = document.getElementById('output');
+const lineNumbers = document.getElementById('line-numbers')
 
 // Inicialização do Sistema
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Sistema pronto.");
     } catch (e) {
         console.error("Erro fatal na inicialização:", e);
-        log(`Erro Fatal: ${e.message}`, "error");
+        log(t('msgFatalError', e.message), "error");
     }
 });
 
@@ -57,7 +58,7 @@ btnAssemble.addEventListener('click', () => {
         for (const word of words) {
             // Proteção contra estouro de memória
             if (addr + 4 > state.memory.length) {
-                throw new Error("Programa muito grande para a memória (1KB).");
+                throw new Error(t('msgMemoryOverflow'));
             }
 
             // Escreve 4 bytes: MSB no endereço menor
@@ -79,18 +80,18 @@ btnAssemble.addEventListener('click', () => {
         // O initCpu() já fez isso, mas para garantir:
         initCpu();
 
-        log(`Sucesso: ${words.length} instruções carregadas na memória.`, "success");
+        log(t('msgAssembleSuccess', words.length), "success");
         updateUI();
 
     } catch (e) {
-        log(`Erro de Montagem: ${e.message}`, "error");
+        log(t('msgAssembleError', e.message), "error");
         console.error(e);
     }
 });
 
 btnReset.addEventListener('click', () => {
     initCpu();
-    log("CPU Resetada.", "info");
+    log(t('msgCpuReset'), "info");
     updateUI();
 });
 
@@ -99,7 +100,7 @@ btnStep.addEventListener('click', () => {
         step();          // Executa um ciclo completo (monociclo)
         updateUI();      // Reflete PC/regs na interface
     } catch (e) {
-        log(`Erro no Step: ${e.message}`, 'error');
+        log(t('msgStepError', e.message), 'error');
         console.error(e);
     }
 });
@@ -109,7 +110,7 @@ btnStepPipeline.addEventListener('click', () => {
         stepPipeline();  // Executa um ciclo do pipeline
         updateUI();
     } catch (e) {
-        log(`Erro no Pipeline Step: ${e.message}`, 'error');
+        log(t('msgPipelineError', e.message), 'error');
         console.error(e);
     }
 });
@@ -117,8 +118,14 @@ btnStepPipeline.addEventListener('click', () => {
 btnDelaySlot.addEventListener('click', () => {
     state.config.delaySlot = !state.config.delaySlot;
     updateDelaySlotUI();
-    log(`Delay Slot ${state.config.delaySlot ? 'ativado' : 'desativado'}.`, 'info');
+    log(state.config.delaySlot ? t('msgDelaySlotOn') : t('msgDelaySlotOff'), 'info');
 });
+
+txtAsm.addEventListener('scroll', () => {
+    lineNumbers.scrollTop = txtAsm.scrollTop;
+})
+txtAsm.addEventListener('input', updateLineNumbers);
+updateLineNumbers();
 
 // Atualização da Interface
 function updateUI() {
@@ -203,16 +210,16 @@ function updateUI() {
     const cacheD = document.getElementById('cacheD');
     if (cacheD) cacheD.innerHTML = renderCache(state.dCache, 'D-Cache');
 
-    // RAM dump (primeiros 256 bytes)
+    // RAM dump (primeiros 256 bytes) — 8 bytes per row for drawer readability
     const ramDiv = document.getElementById('ramView');
     if (ramDiv) {
         const maxBytes = Math.min(CONSTANTS.MEMORY_SIZE, 256);
         let ramHTML = '<table><tr><th>Addr</th>';
-        for (let o = 0; o < 16; o++) ramHTML += `<th>+${o.toString(16).toUpperCase()}</th>`;
+        for (let o = 0; o < 8; o++) ramHTML += `<th>+${o.toString(16).toUpperCase()}</th>`;
         ramHTML += '</tr>';
-        for (let addr = 0; addr < maxBytes; addr += 16) {
+        for (let addr = 0; addr < maxBytes; addr += 8) {
             let row = `<tr><td>${fmtHex(addr)}</td>`;
-            for (let o = 0; o < 16; o++) {
+            for (let o = 0; o < 8; o++) {
                 row += `<td>${fmtByte(state.memory[addr + o])}</td>`;
             }
             row += '</tr>';
@@ -230,11 +237,96 @@ function updateUI() {
 
 function log(msg, type = 'info') {
     const color = type === 'error' ? 'red' : (type === 'success' ? 'green' : 'black');
-    outputDiv.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+    outputDiv.innerHTML += `<div style="color:${color}"> ${msg}</div>`;
     outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
 function updateDelaySlotUI() {
-    if (!btnDelaySlot) return;
-    btnDelaySlot.textContent = `Delay Slot: ${state.config.delaySlot ? 'ON' : 'OFF'}`;
+    const label = document.getElementById('delaySlotLabel');
+    if (!label) return;
+    label.textContent = `Delay Slot: ${state.config.delaySlot ? 'ON' : 'OFF'}`;
 }
+
+function applyTranslation(language) {
+    setLanguage(language);
+
+    document.querySelectorAll("[language]").forEach(element => {
+        const key = element.getAttribute("language");
+        element.textContent = translations[language][key];
+    });
+    document.querySelectorAll("[language-placeholder]").forEach(element => {
+        const key = element.getAttribute("language-placeholder");
+        element.placeholder = translations[language][key];
+    })
+    updateLineNumbers();
+}
+window.applyTranslation = applyTranslation;
+
+let drawerDocked = false;
+
+function toggleDrawer(section) {
+    const panel = document.getElementById('drawerPanel');
+    const overlay = document.getElementById('drawerOverlay');
+    const sectionEl = document.getElementById(section === 'cache' ? 'drawerCache' : 'drawerRam');
+    const tabEl = document.getElementById(section === 'cache' ? 'drawerTabCache' : 'drawerTabRam');
+
+    if (!sectionEl || !panel) return;
+
+    sectionEl.classList.toggle('visible');
+    tabEl?.classList.toggle('active');
+
+    // Check if any section is still visible
+    const anyVisible = panel.querySelector('.drawer-section.visible');
+    if (anyVisible) {
+        panel.classList.add('open');
+        if (!drawerDocked) overlay?.classList.add('visible');
+    } else {
+        panel.classList.remove('open');
+        overlay?.classList.remove('visible');
+        // Undock if nothing is visible
+        if (drawerDocked) {
+            drawerDocked = false;
+            document.body.classList.remove('drawer-docked');
+            document.getElementById('drawerPinBtn')?.classList.remove('active');
+        }
+    }
+}
+window.toggleDrawer = toggleDrawer;
+
+function closeAllDrawers() {
+    const panel = document.getElementById('drawerPanel');
+    const overlay = document.getElementById('drawerOverlay');
+    panel?.classList.remove('open');
+    overlay?.classList.remove('visible');
+    panel?.querySelectorAll('.drawer-section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.drawer-tab').forEach(t => t.classList.remove('active'));
+    // Undock
+    drawerDocked = false;
+    document.body.classList.remove('drawer-docked');
+    document.getElementById('drawerPinBtn')?.classList.remove('active');
+}
+window.closeAllDrawers = closeAllDrawers;
+
+function toggleDrawerPin() {
+    const panel = document.getElementById('drawerPanel');
+    const overlay = document.getElementById('drawerOverlay');
+    const pinBtn = document.getElementById('drawerPinBtn');
+
+    drawerDocked = !drawerDocked;
+    document.body.classList.toggle('drawer-docked', drawerDocked);
+    pinBtn?.classList.toggle('active', drawerDocked);
+
+    if (drawerDocked) {
+        overlay?.classList.remove('visible');
+    } else if (panel?.classList.contains('open')) {
+        overlay?.classList.add('visible');
+    }
+}
+window.toggleDrawerPin = toggleDrawerPin;
+applyTranslation(currentLanguage);
+
+function updateLineNumbers() {
+    const Lines = txtAsm.value.split('\n').length;
+    lineNumbers.innerText = Array.from({ length: Lines }, (_, i) => i + 1).join('\n')
+}
+updateLineNumbers()

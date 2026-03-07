@@ -2,10 +2,10 @@
 <html lang="pt-BR">
 
 <head>
-    <script type="module" src="js/main.js?v=5"></script>
+    <script type="module" src="js/main.js?v=6"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIPSweb - Simulador Didático</title>
+    <title language="title"></title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -13,63 +13,219 @@
     <div class="container">
         <header class="topbar">
             <div>
-                <h1>Oldowan (MIPSweb Simulator) <span class="badge">R6 Hardware-First</span></h1>
-                <p>Simulador MIPS32 focado em fidelidade arquitetural (Datapath & Control)</p>
+                <h1>
+                    <span language="title"></span>
+                    <span class="badge">R6 Hardware-First</span>
+                </h1>
+                <p language="subtitlte"></p>
             </div>
             <div class="controls">
-                <button id="btnAssemble" class="primary">🛠️ Montar</button>
-                <button id="btnReset" class="danger">🔄 Reset</button>
-                <button id="btnStep">▶ Step</button>
-                <button id="btnStepPipeline">⏩ Pipeline</button>
-                <button id="btnDelaySlot" class="secondary">Delay Slot: ON</button>
+                <select id="languageSelector" onchange="applyTranslation(this.value)">
+                    <option value="" language="languageSelector"></option>
+                    <option value="pt">🇧🇷 Português</option>
+                    <option value="en">🇺🇸 English</option>
+                </select>
+                <button id="btnAssemble">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                    </svg>
+                    <span language="btnAssemble"></span>
+                </button>
+                <button id="btnReset">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="1 4 1 10 7 10" />
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                    </svg>
+                    <span language="btnReset"></span>
+                </button>
+                <button id="btnStep">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 4 15 12 5 20 5 4" />
+                        <line x1="19" y1="5" x2="19" y2="19" />
+                    </svg>
+                    <span language="btnStep"></span>
+                </button>
+                <button id="btnStepPipeline">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 19 22 12 13 5 13 19" />
+                        <polygon points="2 19 11 12 2 5 2 19" />
+                    </svg>
+                    <span language="btnStepPipeline"></span>
+                </button>
+                <button id="btnDelaySlot">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span id="delaySlotLabel" language="btnDelaySlot"></span>
+                </button>
             </div>
         </header>
 
         <main class="main-grid">
-            <section class="panel code-panel">
-                <div class="panel-header">
-                    <span>Código</span>
-                    <span class="pc-line">PC: <span id="pcDisplay"></span></span>
-                </div>
-                <textarea id="asmInput" spellcheck="false" placeholder="Escreva seu código MIPS Assembly aqui...
-Exemplo:
-ADDI $t0, $zero, 10
-ADDI $t1, $zero, 20
-ADD  $t2, $t0, $t1">
-# Exemplo de Teste MIPS32
-ADDI $t0, $zero, 5   # A = 5
-ADDI $t1, $zero, 8   # B = 8
-ADD  $t2, $t0, $t1   # C = A + B (Deve ser 13)
-SLL  $t3, $t1, 2     # Shift Left: 8 << 2 = 32
-</textarea>
-            </section>
+            <div class="code-colum">
+                <section class="panel code-panel">
+                    <div class="panel-header">
+                        <span language="codeTitle"></span>
+                        <span class="pc-line">
+                            <span language="pcLine"></span>
+                            <span id="pcDisplay"></span>
+                        </span>
+                    </div>
+                    <div class="editor-wrapper">
+                        <div id="line-numbers" class="line-numbers"></div>
+                        <textarea id="asmInput" spellcheck="false" language-placeholder="asmInputPlaceholder"
+                            language="asmInput"></textarea>
+                    </div>
+                </section>
+                <section class="panel console-panel">
+                    <h2 language="consoleTitle"></h2>
+                    <div id="output" class="console-box"></div>
+                </section>
+            </div>
 
-            <section class="panel pipeline-panel">
-                <h2>Pipeline (IF/ID/EX/MEM/WB)</h2>
-                <div id="pipeline" class="table-container"></div>
-            </section>
+            <div class="sidebar">
+                <details class="panel collapsible" open>
+                    <summary class="collapsible-header">
+                        <svg class="panel-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                        <span language="pipelineTitle"></span>
+                        <span class="chevron">▾</span>
+                    </summary>
+                    <div id="pipeline" class="table-container collapsible-body"></div>
+                </details>
 
-            <section class="panel regs-panel">
-                <h2>Registradores (GPR)</h2>
-                <div id="registers" class="table-container"></div>
-            </section>
+                <details class="panel collapsible" open>
+                    <summary class="collapsible-header">
+                        <svg class="panel-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        <span language="regsTitle"></span>
+                        <span class="chevron">▾</span>
+                    </summary>
+                    <div id="registers" class="table-container collapsible-body"></div>
+                </details>
+            </div>
+        </main>
+    </div>
 
-            <section class="panel cache-panel">
-                <h2>Caches (I/D)</h2>
+
+    <!-- Slide-out drawer -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeAllDrawers()"></div>
+    <aside class="drawer-panel" id="drawerPanel">
+        <div class="drawer-toolbar">
+            <span class="drawer-toolbar-title">Memory Inspector</span>
+            <button class="drawer-pin-btn" id="drawerPinBtn" onclick="toggleDrawerPin()" title="Fixar gaveta (dock)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="17" x2="12" y2="22" />
+                    <path
+                        d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z" />
+                </svg>
+            </button>
+            <button class="drawer-close-all-btn" onclick="closeAllDrawers()" title="Fechar tudo">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-section" id="drawerCache">
+            <div class="drawer-section-header">
+                <svg class="panel-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="8" rx="2" />
+                    <rect x="2" y="14" width="20" height="8" rx="2" />
+                    <line x1="6" y1="6" x2="6.01" y2="6" />
+                    <line x1="6" y1="18" x2="6.01" y2="18" />
+                </svg>
+                <span language="cacheTitle"></span>
+                <button class="drawer-close-btn" onclick="toggleDrawer('cache')" title="Fechar">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="drawer-section-body">
                 <div id="cacheI" class="table-container"></div>
                 <div id="cacheD" class="table-container" style="margin-top:8px;"></div>
-            </section>
-
-            <section class="panel console-panel">
-                <h2>Console</h2>
-                <div id="output" class="console-box"></div>
-            </section>
-
-            <section class="panel ram-panel">
-                <h2>RAM (dump parcial)</h2>
+            </div>
+        </div>
+        <div class="drawer-section" id="drawerRam">
+            <div class="drawer-section-header">
+                <svg class="panel-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <rect x="9" y="9" width="6" height="6" />
+                    <line x1="9" y1="2" x2="9" y2="4" />
+                    <line x1="15" y1="2" x2="15" y2="4" />
+                    <line x1="9" y1="20" x2="9" y2="22" />
+                    <line x1="15" y1="20" x2="15" y2="22" />
+                    <line x1="2" y1="9" x2="4" y2="9" />
+                    <line x1="2" y1="15" x2="4" y2="15" />
+                    <line x1="20" y1="9" x2="22" y2="9" />
+                    <line x1="20" y1="15" x2="22" y2="15" />
+                </svg>
+                <span language="ramTitle"></span>
+                <button class="drawer-close-btn" onclick="toggleDrawer('ram')" title="Fechar">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="drawer-section-body">
                 <div id="ramView" class="table-container"></div>
-            </section>
-        </main>
+            </div>
+        </div>
+    </aside>
+
+    <div class="drawer-strip">
+        <button class="drawer-tab" id="drawerTabCache" onclick="toggleDrawer('cache')" title="Cache">
+            <svg class="drawer-tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2" />
+                <rect x="2" y="14" width="20" height="8" rx="2" />
+                <line x1="6" y1="6" x2="6.01" y2="6" />
+                <line x1="6" y1="18" x2="6.01" y2="18" />
+            </svg>
+            <span class="drawer-tab-label" language="cacheTitle"></span>
+        </button>
+        <button class="drawer-tab" id="drawerTabRam" onclick="toggleDrawer('ram')" title="RAM">
+            <svg class="drawer-tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <line x1="9" y1="2" x2="9" y2="4" />
+                <line x1="15" y1="2" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="22" />
+                <line x1="15" y1="20" x2="15" y2="22" />
+                <line x1="2" y1="9" x2="4" y2="9" />
+                <line x1="2" y1="15" x2="4" y2="15" />
+                <line x1="20" y1="9" x2="22" y2="9" />
+                <line x1="20" y1="15" x2="22" y2="15" />
+            </svg>
+            <span class="drawer-tab-label" language="ramTitle"></span>
+        </button>
     </div>
 
 </body>

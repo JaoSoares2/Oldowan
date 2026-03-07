@@ -1,5 +1,5 @@
-import { registry } from './instructions.js?v=5';
-import { parseRegister, parseImmediate } from './parse.js?v=5';
+import { registry } from './instructions.js?v=6';
+import { parseRegister, parseImmediate } from './parse.js?v=6';
 
 // --- Helpers de Parsing de Texto ---
 
