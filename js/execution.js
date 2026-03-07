@@ -4,12 +4,12 @@
  * Baseado inteiramente em sinais de controle, sem handlers específicos por instrução.
  */
 
-import { CONSTANTS } from './constants.js?v=5';
-import { state } from './state.js?v=5';
-import { registry } from './instructions.js?v=5';
-import { alu } from './alu.js?v=5';
-import { mdu } from './mdu.js?v=5';
-import { ALU_FLAGS } from './constantsALU.js?v=5';
+import { CONSTANTS } from './constants.js?v=6';
+import { state } from './state.js?v=6';
+import { registry } from './instructions.js?v=6';
+import { alu } from './alu.js?v=6';
+import { mdu } from './mdu.js?v=6';
+import { ALU_FLAGS } from './constantsALU.js?v=6';
 import {
     cacheLoadByte,
     resetCache
@@ -79,6 +79,7 @@ export function initCpu() {
     const topOfStack = CONSTANTS.MEMORY_SIZE & ~3;
     state.regs[SP] = topOfStack;
     stallIF = false;
+    state.lastTrace = '';
 }
 
 function regVal(i) { return state.regs[i] | 0; }
@@ -158,7 +159,6 @@ export function step() {
     let takeBranch = false;
 
     if (ctrl.branch) {
-        // A ALU fez a subtração (aluCode=SUB). Verificamos as flags.
         // BEQ (Opcode 4): Branch se Zero=1
         // BNE (Opcode 5): Branch se Zero=0
         // BLEZ/BGTZ: Lógica baseada em flags NEG e ZERO
@@ -319,6 +319,14 @@ export function stepPipeline() {
     stageIF();
 
     state.pipeline.cycle++;
+
+    // Gera trace do pipeline para o console
+    const regs = state.pipeline.registers;
+    const ifName = regs.IF_ID.valid ? (registry.decode(regs.IF_ID.instr >>> 0)?.name || '???') : '-';
+    const idName = regs.ID_EX.valid ? (regs.ID_EX.name || '???') : '-';
+    const exName = regs.EX_MEM.valid ? (regs.EX_MEM.name || '???') : '-';
+    const memName = regs.MEM_WB.valid ? (regs.MEM_WB.name || '???') : '-';
+    state.lastTrace = `[Cycle ${state.pipeline.cycle}] IF: ${ifName} | ID: ${idName} | EX: ${exName} | MEM/WB: ${memName}`;
 }
 
 // --- Estágios do Pipeline ---

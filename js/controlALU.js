@@ -4,7 +4,7 @@
  * Responsabilidade: Traduzir (ALUOp + Funct) -> ALU Control Lines (4 bits)
  */
 
-import { ALU_CODES } from './constantsALU.js?v=5';
+import { ALU_CODES } from './constantsALU.js?v=6';
 
 // Constantes de Interface (sinais de entrada vindos da Main Control)
 export const ALU_OP = {

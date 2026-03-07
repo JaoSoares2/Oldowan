@@ -1,5 +1,5 @@
 
-import { REGISTER_ALIAS } from './constants.js?v=5';
+import { REGISTER_ALIAS } from './constants.js?v=6';
 
 
 // Funções auxiliares para parsing

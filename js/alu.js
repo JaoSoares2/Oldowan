@@ -2,7 +2,7 @@
  * MIPSweb - ALU (Arithmetic Logic Unit)
 */
 
-import { ALU_CODES, ALU_FLAGS } from './constantsALU.js?v=5';
+import { ALU_CODES, ALU_FLAGS } from './constantsALU.js?v=6';
 
 // ============================================================================
 // CIRCUITOS INTERNOS
