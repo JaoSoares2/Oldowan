@@ -37,7 +37,7 @@ export function loadHalfword(addr) {
     cacheLoadByte(state.dCache, state.memory, addr + 1);
 
     // Leitura real via DataView
-    return view.getInt16(addr, isBigEndian);
+    return view.getInt16(addr, !isBigEndian);
 }
 
 export function loadHalfwordUnsigned(addr) {
@@ -45,7 +45,7 @@ export function loadHalfwordUnsigned(addr) {
     cacheLoadByte(state.dCache, state.memory, addr);
     cacheLoadByte(state.dCache, state.memory, addr + 1);
 
-    return view.getUint16(addr, isBigEndian);
+    return view.getUint16(addr, !isBigEndian);
 }
 
 export function loadWord(addr) {
@@ -53,7 +53,7 @@ export function loadWord(addr) {
     // Simula acesso à cache para os 4 bytes (para contar hits/misses)
     for (let i = 0; i < 4; i++) cacheLoadByte(state.dCache, state.memory, addr + i);
 
-    return view.getInt32(addr, isBigEndian);
+    return view.getInt32(addr, !isBigEndian);
 }
 
 // Preparado para MIPS64 (future-proof)
@@ -61,7 +61,7 @@ export function loadDoubleword(addr) {
     checkAlignment(addr, 8);
     for (let i = 0; i < 8; i++) cacheLoadByte(state.dCache, state.memory, addr + i);
 
-    return view.getBigInt64(addr, isBigEndian);
+    return view.getBigInt64(addr, !isBigEndian);
 }
 
 // --- Escrita (Store) ---
@@ -111,5 +111,5 @@ export function storeWord(addr, value) {
 // Acesso bruto para o Loader (sem cache ticks)
 export function storeWordRaw(addr, value) {
     // Usa DataView direto para velocidade no load
-    view.setInt32(addr, value, isBigEndian);
+    view.setInt32(addr, value, !isBigEndian);
 }

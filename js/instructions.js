@@ -116,7 +116,7 @@ class InstructionRegistry {
 
         let instr = null;
         for (const candidate of potentialMatches) {
-            if ((word & candidate.mask) === candidate.match) {
+            if (((word & candidate.mask) >>> 0) === candidate.match) {
                 instr = candidate;
                 break;
             }
